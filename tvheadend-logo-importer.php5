@@ -76,7 +76,33 @@ if ($input_line) {
 	exit;
 };
 
+// Let's see if we can get some other logos via try-and-error
+$ch_directory=opendir($tvh_user_home."channels/");
+while (($dir_entry = readdir($ch_directory)) !== false) {
+	$chk_chanfile=file_get_contents($tvh_user_home."channels/".$dir_entry);
+	$chk_json=json_decode($chk_chanfile,true);
+	if (empty($chk_json["icon"])) {
+		$url = "http://www.lyngsat-logo.com/tvchannel/de/".str_replace(" ","-",$chk_json["name"]).".html";
+		 if (!is_404($url)) {
+			 $content = file_get_contents($url);
+			 $imgurl = explode('"',explode('<td align="center"><img src="',$content)[1])[0];
+			 if (!empty($imgurl)) {
+			 	chan_update($dir_entry,$imgurl);
+			 }
+		 }
+	}
+}
 
+function is_404($url) {
+	$ch = curl_init();
+	curl_setopt($ch, CURLOPT_URL, $url);
+	curl_setopt($ch, CURLOPT_NOBODY, 1);
+	curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+	curl_exec($ch);
+	$is404 = curl_getinfo($ch, CURLINFO_HTTP_CODE) == 404;
+	curl_close($ch);
+	return $is404;
+}
 
 // Try to load config automagically
 function auto_config() {
