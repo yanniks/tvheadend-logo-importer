@@ -87,7 +87,7 @@ while (($dir_entry = readdir($ch_directory)) !== false) {
 			 $content = file_get_contents($url);
 			 $imgurl = explode('"',explode('<td align="center"><img src="',$content)[1])[0];
 			 if (!empty($imgurl)) {
-			 	chan_update($dir_entry,$imgurl);
+			 	chan_update($dir_entry,str_replace("../..","http://www.lyngsat-logo.com",$imgurl));
 			 }
 		 }
 	}
