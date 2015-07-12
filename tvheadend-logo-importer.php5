@@ -79,6 +79,11 @@ if ($input_line) {
 // Let's see if we can get some other logos via try-and-error
 $ch_directory=opendir($tvh_user_home."channels/");
 while (($dir_entry = readdir($ch_directory)) !== false) {
+	unset($content);
+	unset($url);
+	unset($chk_chanfile);
+	unset($chk_json);
+	unset($imgurl);
 	$chk_chanfile=file_get_contents($tvh_user_home."channels/".$dir_entry);
 	$chk_json=json_decode($chk_chanfile,true);
 	if (empty($chk_json["icon"])) {
