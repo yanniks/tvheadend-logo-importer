@@ -21,6 +21,29 @@ $channel_permit_update=0;
 //  channel icons in a NAME|icon format
 // e.g. BBC One|http://www.lyngsat-logo.com/logo/tv/bb/bbc_one.jpg
 
+$channelconfigfiles = array();
+
+$network_directory=opendir($tvh_user_home."input/dvb/networks/");
+while (($network_entry = readdir($network_directory)) !== false) {
+	$mux_directory=opendir($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/");
+	while (($mux_entry = readdir($mux_directory)) !== false) {
+		if (file_exists($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/".$mux_entry."/services/")) {
+			$ch_directory=opendir($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/".$mux_entry."/services/");
+			while (($dir_entry = readdir($ch_directory)) !== false) {
+				$ch_config=opendir($tvh_user_home."channel/config/");
+				while (($config_entry = readdir($ch_config)) !== false) {
+					$jsonconfig = json_decode(file_get_contents($tvh_user_home."channel/config/".$config_entry),true);
+					if (!empty($jsonconfig["services"])) {
+						if (in_array($dir_entry,$jsonconfig["services"])) {
+							$channelconfigfiles[$dir_entry] = $config_entry;
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 $load_icons = fopen("http://supplement.xmltv.org/tv_grab_uk_rt/channel_icons", "r");
 if ($load_icons) {
     while (($buffer = fgets($load_icons, 4096)) !== false) {
@@ -77,22 +100,28 @@ if ($input_line) {
 };
 
 // Let's see if we can get some other logos via try-and-error
-$ch_directory=opendir($tvh_user_home."channels/");
-while (($dir_entry = readdir($ch_directory)) !== false) {
-	unset($content);
-	unset($url);
-	unset($chk_chanfile);
-	unset($chk_json);
-	unset($imgurl);
-	$chk_chanfile=file_get_contents($tvh_user_home."channels/".$dir_entry);
-	$chk_json=json_decode($chk_chanfile,true);
-	if (empty($chk_json["icon"])) {
-		$url = "http://www.lyngsat-logo.com/tvchannel/de/".str_replace(" ","-",$chk_json["name"]).".html";
-		 if (!is_404($url)) {
-			 $content = file_get_contents($url);
-			 $imgurl = explode('"',explode('<td align="center"><img src="',$content)[1])[0];
-			 if (!empty($imgurl)) {
-			 	chan_update($dir_entry,str_replace("../..","http://www.lyngsat-logo.com",$imgurl));
+$network_directory=opendir($tvh_user_home."input/dvb/networks/");
+while (($network_entry = readdir($network_directory)) !== false) {
+	$mux_directory=opendir($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/");
+	while (($mux_entry = readdir($mux_directory)) !== false) {
+		$ch_directory=opendir($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/".$mux_entry."/services/");
+		while (($dir_entry = readdir($ch_directory)) !== false) {
+			unset($content);
+			unset($url);
+			unset($chk_chanfile);
+			unset($chk_json);
+			unset($imgurl);
+			$chk_chanfile=file_get_contents($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/".$mux_entry."/services/".$dir_entry);
+			$chk_json=json_decode($chk_chanfile,true);
+			if (empty($chk_json["icon"])) {
+				$url = "http://www.lyngsat-logo.com/tvchannel/de/".str_replace(" ","-",$chk_json["name"]).".html";
+				 if (!is_404($url)) {
+					 $content = file_get_contents($url);
+					 $imgurl = explode('"',explode('<td align="center"><img src="',$content)[1])[0];
+					 if (!empty($imgurl)) {
+					 	chan_update($dir_entry,str_replace("../..","http://www.lyngsat-logo.com",$imgurl));
+					}
+				 }
 			 }
 		 }
 	}
@@ -142,7 +171,7 @@ function auto_config() {
 	};
 	};
 	echo "Found TVH config at $tvh_user_home\n";
-	if (file_exists($tvh_user_home."channels/")) {
+	if (file_exists($tvh_user_home."channel/config/")) {
 		echo "Found channels folder\n";
 		$fail=0;
 	} else {
@@ -210,65 +239,72 @@ function prettyPrint( $json )
 }
 
 function chan_search($chan_name) {
-	global $tvh_user_home,$channel_permit_update;
-	$ch_directory=opendir($tvh_user_home."channels/");
-		while (($dir_entry = readdir($ch_directory)) !== false) {
-			// check entry of dir_entry
-			// these are in JSON like structures
-			$chk_chanfile=file_get_contents($tvh_user_home."channels/".$dir_entry);
-			$chk_json=json_decode($chk_chanfile,true);
-			$found=0;
-			$icon_found=0;
-			if ($chk_json) {
-				//echo "COMPARE: '".$chk_json['name']."' and '".$chan_name."'\n";
-				if (stripos($chk_json['name'], $chan_name) !== false) {
-					// check for $channel_permit_update
-					// If set to 0 then dont return the chan if it has an icon already
-					if(@$chk_json['icon']) {
-						if ($channel_permit_update == 1) {
-							echo "FOUND: $chan_name in file $dir_entry\n";
-							$found=1;
+	global $tvh_user_home,$channel_permit_update,$channelconfigfiles;
+	$network_directory=opendir($tvh_user_home."input/dvb/networks/");
+	while (($network_entry = readdir($network_directory)) !== false) {
+		$mux_directory=opendir($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/");
+		while (($mux_entry = readdir($mux_directory)) !== false) {
+			$ch_directory=opendir($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/".$mux_entry."/services/");
+			while (($dir_entry = readdir($ch_directory)) !== false) {
+				// check entry of dir_entry
+				// these are in JSON like structures
+				$chk_chanfile=file_get_contents($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/".$mux_entry."/services/".$dir_entry);
+				$chk_json=json_decode($chk_chanfile,true);
+				$found=0;
+				$icon_found=0;
+				if ($chk_json) {
+					//echo "COMPARE: '".$chk_json['svcname']."' and '".$chan_name."'\n";
+					if (stripos($chk_json['svcname'], $chan_name) !== false) {
+						// check for $channel_permit_update
+						// If set to 0 then dont return the chan if it has an icon already
+						$channelconfig = json_decode(file_get_contents($tvh_user_home."channel/config/".$channelconfigfiles[$dir_entry]),true);
+						if(@$channelconfig['icon']) {
+							if ($channel_permit_update == 1) {
+								echo "FOUND: $chan_name in file $dir_entry\n";
+								$found=1;
+							} else {
+								echo "SKIP: $chan_name already has icon set, and set to ignore\n";
+								$found=0;
+							};
 						} else {
-							echo "SKIP: $chan_name already has icon set, and set to ignore\n";
-							$found=0;
+							echo "FOUND: $chan_name in file $dir_entry\n";
+	                                                $found=1;
 						};
-					} else {
-						echo "FOUND: $chan_name in file $dir_entry\n";
-                                                $found=1;
 					};
-				};
-				if ($chk_json['name'] == $chan_name) {
-					if(@$chk_json['icon']) {
-						if ($channel_permit_update == 1) {
+					if ($chk_json['svcname'] == $chan_name) {
+						if(@$chk_json['icon']) {
+							if ($channel_permit_update == 1) {
+								echo "FOUND EXACT MATCH: $chan_name in file $dir_entry\n";
+								$found=1;
+							} else {
+								echo "SKIP EXACT MATCH: $chan_name already has icon set, and set to ignore\n";
+								$found=0;
+							};
+						} else {
 							echo "FOUND EXACT MATCH: $chan_name in file $dir_entry\n";
 							$found=1;
-						} else {
-							echo "SKIP EXACT MATCH: $chan_name already has icon set, and set to ignore\n";
-							$found=0;
 						};
-					} else {
-						echo "FOUND EXACT MATCH: $chan_name in file $dir_entry\n";
-						$found=1;
 					};
 				};
-			};
-			if ($found) {
-				return $dir_entry;
-			};
-		};
+				if ($found) {
+					return $dir_entry;
+				};
+			}
+		}
+	}
 };
 function chan_update($chan_filename,$ch_icon) {
-	global $tvh_user_home;
+	global $tvh_user_home,$channelconfigfiles;
 	if ($ch_icon) {
 	echo "Updating icon ($chan_filename) and ($ch_icon)\n";
-        $chk_chanfile=file_get_contents($tvh_user_home."channels/".$chan_filename);
+        $chk_chanfile=file_get_contents($tvh_user_home."channel/config/".$channelconfigfiles[$chan_filename]);
         $chk_json=json_decode($chk_chanfile,true);
 //	$chk_json['icon']=$ch_icon;
 	unset($chk_json['icon']);
 	$chk_json['icon']="$ch_icon";
 	$json_new=prettyPrint(json_encode($chk_json));
 	$json_new=str_replace("\/","/",$json_new);
-	$out_chan=fopen($tvh_user_home."channels/".$chan_filename, "w");
+	$out_chan=fopen($tvh_user_home."channel/config/".$channelconfigfiles[$chan_filename], "w");
 	fwrite($out_chan, $json_new);
 	fclose($out_chan);
 	} else {
