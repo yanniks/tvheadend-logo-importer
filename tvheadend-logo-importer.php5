@@ -1,4 +1,4 @@
-#!/usr/bin/php5
+#!/usr/bin/php
 
 <?php
 // php5 UK channel icon importer for TVHeadend by Andy Brown http://github.com/andyb2000
@@ -25,17 +25,19 @@ $channelconfigfiles = array();
 
 $network_directory=opendir($tvh_user_home."input/dvb/networks/");
 while (($network_entry = readdir($network_directory)) !== false) {
-	$mux_directory=opendir($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/");
-	while (($mux_entry = readdir($mux_directory)) !== false) {
-		if (file_exists($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/".$mux_entry."/services/")) {
-			$ch_directory=opendir($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/".$mux_entry."/services/");
-			while (($dir_entry = readdir($ch_directory)) !== false) {
-				$ch_config=opendir($tvh_user_home."channel/config/");
-				while (($config_entry = readdir($ch_config)) !== false) {
-					$jsonconfig = json_decode(file_get_contents($tvh_user_home."channel/config/".$config_entry),true);
-					if (!empty($jsonconfig["services"])) {
-						if (in_array($dir_entry,$jsonconfig["services"])) {
-							$channelconfigfiles[$dir_entry] = $config_entry;
+	if (file_exists($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/")) {
+		$mux_directory=opendir($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/");
+		while (($mux_entry = readdir($mux_directory)) !== false) {
+			if (file_exists($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/".$mux_entry."/services/")) {
+				$ch_directory=opendir($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/".$mux_entry."/services/");
+				while (($dir_entry = readdir($ch_directory)) !== false) {
+					$ch_config=opendir($tvh_user_home."channel/config/");
+					while (($config_entry = readdir($ch_config)) !== false) {
+						$jsonconfig = json_decode(file_get_contents($tvh_user_home."channel/config/".$config_entry),true);
+						if (!empty($jsonconfig["services"])) {
+							if (in_array($dir_entry,$jsonconfig["services"])) {
+								$channelconfigfiles[$dir_entry] = $config_entry;
+							}
 						}
 					}
 				}
@@ -43,7 +45,6 @@ while (($network_entry = readdir($network_directory)) !== false) {
 		}
 	}
 }
-
 $load_icons = fopen("http://supplement.xmltv.org/tv_grab_uk_rt/channel_icons", "r");
 if ($load_icons) {
     while (($buffer = fgets($load_icons, 4096)) !== false) {
@@ -242,53 +243,57 @@ function chan_search($chan_name) {
 	global $tvh_user_home,$channel_permit_update,$channelconfigfiles;
 	$network_directory=opendir($tvh_user_home."input/dvb/networks/");
 	while (($network_entry = readdir($network_directory)) !== false) {
-		$mux_directory=opendir($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/");
-		while (($mux_entry = readdir($mux_directory)) !== false) {
-			$ch_directory=opendir($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/".$mux_entry."/services/");
-			while (($dir_entry = readdir($ch_directory)) !== false) {
-				// check entry of dir_entry
-				// these are in JSON like structures
-				$chk_chanfile=file_get_contents($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/".$mux_entry."/services/".$dir_entry);
-				$chk_json=json_decode($chk_chanfile,true);
-				$found=0;
-				$icon_found=0;
-				if ($chk_json) {
-					//echo "COMPARE: '".$chk_json['svcname']."' and '".$chan_name."'\n";
-					if (stripos($chk_json['svcname'], $chan_name) !== false) {
-						// check for $channel_permit_update
-						// If set to 0 then dont return the chan if it has an icon already
-						$channelconfig = json_decode(file_get_contents($tvh_user_home."channel/config/".$channelconfigfiles[$dir_entry]),true);
-						if(@$channelconfig['icon']) {
-							if ($channel_permit_update == 1) {
-								echo "FOUND: $chan_name in file $dir_entry\n";
-								$found=1;
-							} else {
-								echo "SKIP: $chan_name already has icon set, and set to ignore\n";
-								$found=0;
+		if (file_exists($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/")) {
+			$mux_directory=opendir($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/");
+			while (($mux_entry = readdir($mux_directory)) !== false) {
+				if (file_exists($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/".$mux_entry."/services/")) {
+					$ch_directory=opendir($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/".$mux_entry."/services/");
+					while (($dir_entry = readdir($ch_directory)) !== false) {
+						// check entry of dir_entry
+						// these are in JSON like structures
+						$chk_chanfile=file_get_contents($tvh_user_home."input/dvb/networks/".$network_entry."/muxes/".$mux_entry."/services/".$dir_entry);
+						$chk_json=json_decode($chk_chanfile,true);
+						$found=0;
+						$icon_found=0;
+						if ($chk_json) {
+							//echo "COMPARE: '".$chk_json['svcname']."' and '".$chan_name."'\n";
+							if (stripos($chk_json['svcname'], $chan_name) !== false) {
+								// check for $channel_permit_update
+								// If set to 0 then dont return the chan if it has an icon already
+								$channelconfig = json_decode(file_get_contents($tvh_user_home."channel/config/".$channelconfigfiles[$dir_entry]),true);
+								if(@$channelconfig['icon']) {
+									if ($channel_permit_update == 1) {
+										echo "FOUND: $chan_name in file $dir_entry\n";
+										$found=1;
+									} else {
+										echo "SKIP: $chan_name already has icon set, and set to ignore\n";
+										$found=0;
+									};
+								} else {
+									echo "FOUND: $chan_name in file $dir_entry\n";
+			                                                $found=1;
+								};
 							};
-						} else {
-							echo "FOUND: $chan_name in file $dir_entry\n";
-	                                                $found=1;
-						};
-					};
-					if ($chk_json['svcname'] == $chan_name) {
-						if(@$chk_json['icon']) {
-							if ($channel_permit_update == 1) {
-								echo "FOUND EXACT MATCH: $chan_name in file $dir_entry\n";
-								$found=1;
-							} else {
-								echo "SKIP EXACT MATCH: $chan_name already has icon set, and set to ignore\n";
-								$found=0;
+							if ($chk_json['svcname'] == $chan_name) {
+								if(@$chk_json['icon']) {
+									if ($channel_permit_update == 1) {
+										echo "FOUND EXACT MATCH: $chan_name in file $dir_entry\n";
+										$found=1;
+									} else {
+										echo "SKIP EXACT MATCH: $chan_name already has icon set, and set to ignore\n";
+										$found=0;
+									};
+								} else {
+									echo "FOUND EXACT MATCH: $chan_name in file $dir_entry\n";
+									$found=1;
+								};
 							};
-						} else {
-							echo "FOUND EXACT MATCH: $chan_name in file $dir_entry\n";
-							$found=1;
 						};
-					};
-				};
-				if ($found) {
-					return $dir_entry;
-				};
+						if ($found) {
+							return $dir_entry;
+						};
+					}
+				}
 			}
 		}
 	}
